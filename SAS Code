@@ -1,0 +1,77 @@
+
+/*
+SAS/ACCESS software for relational databases provides an interface between SAS software and data in other 
+vendors' database management systems (DBMSs). SAS/ACCESS software provides dynamic access to DBMS data through 
+the SAS/ACCESS LIBNAME statement and the PROC SQL pass-through facility.
+The LIBNAME statement enables you to assign SAS librefs to DBMS objects such as schemas and databases.
+The SQL procedure pass-through facility enables you to send DBMS-specific SQL statements directly to a DBMS for execution. 
+*/
+
+
+*-------------------------connect to VectorH via pass-through ODBC ;
+
+*quick glance at the two tables, limit results to 10 rows;
+proc sql outobs=10;
+    connect to odbc(dsn=vmcluster user=actian pw=actian);
+
+    select * from connection to odbc(
+        select *
+        from actian.energy_raw);
+
+	 select * from connection to odbc(
+        select  *
+        from actian.energy);
+
+quit;
+
+*create a view via pass-through ODBC so SAS can access the data with any proc;
+proc sql;
+    connect to odbc(dsn=vmcluster user=actian pw=actian);
+
+    create view mydata as select * from connection to odbc(
+        select *
+        from actian.energy);
+
+quit;
+
+*test by getting simple stats with proc means;
+proc means data=mydata;
+	var avg_hourly_kw;
+run;
+
+
+*-------------------establish a libname connection to VecotrH;
+
+libname vh odbc dsn=vmcluster user=actian password=actian;
+
+*veiw library contents;
+proc datasets library=vh;
+run;
+
+*syntax is much simpler;
+proc sql outobs=10;
+	select * from vh.energy;
+quit;
+
+proc means data=vh.energy;
+	var avg_hourly_kw;
+run;
+
+
+*---------------------Compare pass-through SQL to libname on a slightly larger dataset;
+
+*libname;
+proc means data=vh.energy_raw;
+	var kw30;
+run;
+
+*SQL pass-through;
+proc sql;
+    connect to odbc(dsn=vmcluster user=actian pw=actian);
+	
+
+    select * from connection to odbc(
+        select count(*) as N, avg(kw30) as Mean, stddev_samp(kw30) as "Std Dev", min(kw30) as Min, max(kw30) as Max
+        from actian.energy_raw);
+
+quit;
